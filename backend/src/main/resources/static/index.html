@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#080808">
+    <title>CORE — Reservation Engine</title>
+    <link rel="stylesheet" href="/style.css">
+    <script src="/app.js" defer></script>
+</head>
+<body>
+    <aside class="sidebar">
+        <a class="brand" href="/" aria-label="CORE home">C<span>.</span></a>
+
+        <nav class="side-nav" aria-label="Main navigation">
+            <button class="nav-item active" data-section="reserve">
+                <span class="nav-icon">⌘</span>
+                <span>Reserve</span>
+            </button>
+            <button class="nav-item" data-section="events">
+                <span class="nav-icon">▤</span>
+                <span>Events</span>
+            </button>
+            <button class="nav-item" data-section="manage">
+                <span class="nav-icon">↗</span>
+                <span>Manage</span>
+            </button>
+        </nav>
+
+        <div class="sidebar-bottom">
+            <button id="themeToggle" class="nav-item" aria-label="Switch color theme">
+                <span id="themeIcon" class="nav-icon">☼</span>
+                <span id="themeLabel">Light mode</span>
+            </button>
+            <div class="side-caption">CORE ENGINE <span>v1.0</span></div>
+        </div>
+    </aside>
+
+    <main class="main">
+        <header class="topbar">
+            <div class="breadcrumb"><span>CORE</span><span class="slash">/</span> Reservation engine</div>
+            <div class="status"><span class="status-dot"></span> System online</div>
+        </header>
+
+        <section class="workspace">
+            <div class="hero">
+                <div class="eyebrow"><span class="eyebrow-line"></span> SIMPLE. SAFE. SYNCHRONIZED.</div>
+                <h1>Make room<br>for <span>what matters.</span></h1>
+                <p class="hero-copy">
+                    Find your event. Choose your seat.<br>
+                    Leave the reservation logic to CORE.
+                </p>
+            </div>
+
+            <section class="panel" id="reserveSection">
+                <div class="panel-heading">
+                    <div>
+                        <div class="section-kicker">01 / DISCOVER</div>
+                        <h2>Find your seat</h2>
+                    </div>
+                    <span class="step-mark">01 — 03</span>
+                </div>
+
+                <div class="field-grid">
+                    <label class="field">
+                        <span>EVENT</span>
+                        <select id="eventSelect">
+                            <option value="">Loading events…</option>
+                        </select>
+                    </label>
+
+                    <label class="field">
+                        <span>SHOW ID</span>
+                        <input id="showId" type="number" min="1" placeholder="Enter show ID" inputmode="numeric">
+                    </label>
+                </div>
+
+                <div class="action-row">
+                    <p class="field-hint">Choose an event and enter its show ID.</p>
+                    <button id="loadSeats" class="button button-primary">
+                        Find seats <span aria-hidden="true">↗</span>
+                    </button>
+                </div>
+
+                <div id="eventInfo" class="event-info" hidden></div>
+
+                <div id="seatArea" class="seat-area" hidden>
+                    <div class="seat-header">
+                        <div>
+                            <div class="section-kicker">02 / SELECT</div>
+                            <h3>Available seats</h3>
+                        </div>
+                        <div class="legend">
+                            <span><i class="legend-dot available"></i> Available</span>
+                            <span><i class="legend-dot selected"></i> Selected</span>
+                            <span><i class="legend-dot booked"></i> Booked</span>
+                        </div>
+                    </div>
+
+                    <div class="screen-label"><span></span> STAGE / SCREEN <span></span></div>
+                    <div id="seatGrid" class="seat-grid" aria-label="Seat selection"></div>
+
+                    <div class="selection-bar">
+                        <div>
+                            <div class="section-kicker">YOUR SELECTION</div>
+                            <div id="selectionText" class="selection-text">No seat selected</div>
+                        </div>
+                        <button id="bookButton" class="button button-primary" disabled>
+                            Confirm booking <span aria-hidden="true">↗</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel manage-panel" id="manageSection">
+                <div class="panel-heading">
+                    <div>
+                        <div class="section-kicker">03 / MANAGE</div>
+                        <h2>Your reservation</h2>
+                    </div>
+                    <span class="step-mark">LOOKUP</span>
+                </div>
+                <div class="manage-row">
+                    <label class="field manage-field">
+                        <span>BOOKING ID</span>
+                        <input id="bookingId" type="number" min="1" placeholder="Enter booking ID" inputmode="numeric">
+                    </label>
+                    <button id="cancelButton" class="button button-secondary">Cancel booking</button>
+                </div>
+                <p class="field-hint">Cancellation releases the seat for another reservation.</p>
+            </section>
+
+            <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+            <footer class="footer">
+                <span>Designed for better reservations.</span>
+                <span><span class="footer-dot"></span> Powered by CORE</span>
+            </footer>
+        </section>
+    </main>
+</body>
+</html>
