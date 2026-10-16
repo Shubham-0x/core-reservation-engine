@@ -1,3 +1,4 @@
+
 const API = "/api";
 
 const $ = (id) => document.getElementById(id);
@@ -17,6 +18,8 @@ const toast = $("toast");
 let currentSeats = [];
 let selectedSeatId = null;
 let toastTimer;
+let authHeader = null;
+let authenticatedEmail = null;
 
 function showToast(message, isError = false) {
     toast.textContent = message;
@@ -30,7 +33,16 @@ function showToast(message, isError = false) {
 }
 
 async function apiRequest(url, options = {}) {
-    const response = await fetch(url, options);
+    const headers = new Headers(options.headers || {});
+
+    if (authHeader) {
+        headers.set("Authorization", authHeader);
+    }
+
+    const response = await fetch(url, {
+        ...options,
+        headers
+    });
 
     const text = await response.text();
     let data = null;
@@ -46,15 +58,77 @@ async function apiRequest(url, options = {}) {
     if (!response.ok) {
         const message =
             typeof data === "object" && data !== null
-                ? data.error || data.message || data.detail
+                ? data.message || data.error || data.detail
                 : data;
 
-        throw new Error(
+        const error = new Error(
             message || `Request failed with HTTP ${response.status}`
         );
+
+        error.status = response.status;
+        throw error;
     }
 
     return data;
+}
+
+// Credentials are kept only in memory, not in localStorage.
+async function ensureAuthenticated() {
+    if (authHeader && authenticatedEmail) {
+        return true;
+    }
+
+    const email = prompt("Enter your registered email:");
+
+    if (!email || !email.trim()) {
+        showToast("Login required to continue.", true);
+        return false;
+    }
+
+    const password = prompt("Enter your password:");
+
+    if (password === null || password.length === 0) {
+        showToast("Password is required.", true);
+        return false;
+    }
+
+    const basicToken = btoa(`${email.trim()}:${password}`);
+    const temporaryHeader = `Basic ${basicToken}`;
+
+    try {
+        const response = await fetch(`${API}/auth/login`, {
+            method: "POST",
+            headers: {
+                Authorization: temporaryHeader
+            }
+        });
+
+        const text = await response.text();
+        let data = {};
+
+        try {
+            data = text ? JSON.parse(text) : {};
+        } catch {
+            data = { message: text };
+        }
+
+        if (!response.ok) {
+            throw new Error(
+                data.message || data.error || "Login failed. Check your credentials."
+            );
+        }
+
+        authHeader = temporaryHeader;
+        authenticatedEmail = email.trim();
+
+        showToast(`Signed in as ${authenticatedEmail}`);
+        return true;
+    } catch (error) {
+        authHeader = null;
+        authenticatedEmail = null;
+        showToast(`Login failed: ${error.message}`, true);
+        return false;
+    }
 }
 
 function escapeHtml(value) {
@@ -67,7 +141,6 @@ function escapeHtml(value) {
     })[char]);
 }
 
-// Load the event list from the Spring Boot API.
 async function loadEvents() {
     eventSelect.innerHTML = '<option value="">Loading events…</option>';
 
@@ -90,9 +163,6 @@ async function loadEvents() {
             option.dataset.description = event.description || "";
             eventSelect.appendChild(option);
         });
-
-        // Show an event's description without assuming its show ID.
-        eventSelect.addEventListener("change", updateEventInfo);
     } catch (error) {
         eventSelect.innerHTML =
             '<option value="">Could not load events</option>';
@@ -108,7 +178,9 @@ function updateEventInfo() {
         return;
     }
 
-    const description = option.dataset.description || "No description available.";
+    const description =
+        option.dataset.description || "No description available.";
+
     eventInfo.textContent = `${option.textContent} · ${description}`;
     eventInfo.hidden = false;
 }
@@ -128,11 +200,16 @@ function renderSeats() {
         const isAvailable = seat.status === "AVAILABLE";
 
         button.type = "button";
-        button.className = `seat ${isAvailable ? "available" : "booked"}`;
-        button.textContent = seat.seatNumber || `S${seat.seatId ?? seat.id}`;
+        button.className =
+            `seat ${isAvailable ? "available" : "booked"}`;
+
+        button.textContent =
+            seat.seatNumber || `S${seat.seatId ?? seat.id}`;
+
         button.title = isAvailable
             ? `Select seat ${button.textContent}`
             : `Seat ${button.textContent} is booked`;
+
         button.setAttribute("aria-label", button.title);
         button.disabled = !isAvailable;
 
@@ -145,7 +222,8 @@ function renderSeats() {
 
             button.classList.add("selected");
             bookButton.disabled = false;
-            selectionText.textContent = `Seat ${button.textContent} selected`;
+            selectionText.textContent =
+                `Seat ${button.textContent} selected`;
         });
 
         seatGrid.appendChild(button);
@@ -155,7 +233,8 @@ function renderSeats() {
 async function loadSeats() {
     const showId = showIdInput.value.trim();
 
-    if (!showId || !Number.isInteger(Number(showId)) || Number(showId) < 1) {
+    if (!showId || !Number.isInteger(Number(showId)) ||
+        Number(showId) < 1) {
         showToast("Enter a valid show ID.", true);
         showIdInput.focus();
         return;
@@ -178,16 +257,17 @@ async function loadSeats() {
         renderSeats();
         seatArea.hidden = false;
 
-        if (seats.length === 0) {
-            showToast("No seats were found for this show.");
-        } else {
-            showToast(`${seats.length} seats loaded.`);
-        }
+        showToast(
+            seats.length
+                ? `${seats.length} seats loaded.`
+                : "No seats were found for this show."
+        );
     } catch (error) {
         showToast(`Could not load seats: ${error.message}`, true);
     } finally {
         loadSeatsButton.disabled = false;
-        loadSeatsButton.innerHTML = 'Find seats <span aria-hidden="true">↗</span>';
+        loadSeatsButton.innerHTML =
+            'Find seats <span aria-hidden="true">↗</span>';
     }
 }
 
@@ -197,37 +277,51 @@ async function bookSelectedSeat() {
         return;
     }
 
-    // Development mode: use the existing test user.
-    // Replace this with the authenticated user's ID after login is implemented.
-    const userId = 1;
+    if (!(await ensureAuthenticated())) {
+        return;
+    }
 
     bookButton.disabled = true;
     bookButton.textContent = "Reserving…";
 
     try {
-        const booking = await apiRequest(`${API}/bookings`, {
+        const result = await apiRequest(`${API}/bookings`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+                "Content-Type": "application/json"
+            },
             body: JSON.stringify({
-                userId,
                 showSeatId: selectedSeatId
             })
         });
 
-        if (booking?.id != null) {
-            bookingIdInput.value = booking.id;
+        const bookingId = result.bookingId;
+
+        if (bookingId != null) {
+            bookingIdInput.value = bookingId;
+            showToast(
+                `Booking confirmed. Booking ID: ${bookingId}`
+            );
+        } else {
+            showToast(
+                result.message || "Booking completed."
+            );
         }
 
-        showToast(`Booking confirmed. Booking ID: ${booking.id}`);
         await loadSeats();
     } catch (error) {
         showToast(`Booking failed: ${error.message}`, true);
 
-        // Refresh availability because another request may have booked it.
+        if (error.status === 401) {
+            authHeader = null;
+            authenticatedEmail = null;
+        }
+
         await loadSeats();
     } finally {
         bookButton.innerHTML =
             'Confirm booking <span aria-hidden="true">↗</span>';
+        bookButton.disabled = true;
     }
 }
 
@@ -241,6 +335,10 @@ async function cancelBooking() {
         return;
     }
 
+    if (!(await ensureAuthenticated())) {
+        return;
+    }
+
     cancelButton.disabled = true;
     cancelButton.textContent = "Cancelling…";
 
@@ -250,14 +348,20 @@ async function cancelBooking() {
             { method: "PUT" }
         );
 
-        showToast(`Booking ${result.id} cancelled successfully.`);
+        showToast(
+            `Booking ${result.id ?? bookingId} cancelled successfully.`
+        );
 
-        // Refresh the visible seats if a show has been loaded.
         if (!seatArea.hidden && showIdInput.value.trim()) {
             await loadSeats();
         }
     } catch (error) {
         showToast(`Cancellation failed: ${error.message}`, true);
+
+        if (error.status === 401) {
+            authHeader = null;
+            authenticatedEmail = null;
+        }
     } finally {
         cancelButton.disabled = false;
         cancelButton.textContent = "Cancel booking";
@@ -276,7 +380,7 @@ function setTheme(theme) {
     try {
         localStorage.setItem("core-theme", theme);
     } catch {
-        // The theme still works if browser storage is unavailable.
+        // Theme switching still works without browser storage.
     }
 }
 
@@ -303,18 +407,25 @@ function setupNavigation() {
             const target = button.dataset.section;
 
             if (target === "reserve") {
-                $("reserveSection").scrollIntoView({ behavior: "smooth" });
+                $("reserveSection").scrollIntoView({
+                    behavior: "smooth"
+                });
             } else if (target === "events") {
                 eventSelect.focus();
-                $("reserveSection").scrollIntoView({ behavior: "smooth" });
+                $("reserveSection").scrollIntoView({
+                    behavior: "smooth"
+                });
             } else if (target === "manage") {
-                $("manageSection").scrollIntoView({ behavior: "smooth" });
+                $("manageSection").scrollIntoView({
+                    behavior: "smooth"
+                });
                 bookingIdInput.focus({ preventScroll: true });
             }
         });
     });
 }
 
+eventSelect.addEventListener("change", updateEventInfo);
 loadSeatsButton.addEventListener("click", loadSeats);
 bookButton.addEventListener("click", bookSelectedSeat);
 cancelButton.addEventListener("click", cancelBooking);
@@ -328,7 +439,9 @@ $("themeToggle").addEventListener("click", () => {
 });
 
 showIdInput.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") loadSeats();
+    if (event.key === "Enter") {
+        loadSeats();
+    }
 });
 
 initialiseTheme();
