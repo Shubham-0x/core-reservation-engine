@@ -1,25 +1,34 @@
+
 package com.core.backend.service;
 
+import com.core.backend.cache.SeatAvailabilityCache;
 import com.core.backend.entity.Booking;
 import com.core.backend.entity.BookingStatus;
 import com.core.backend.entity.SeatStatus;
 import com.core.backend.entity.ShowSeat;
 import com.core.backend.repository.BookingRepository;
 import com.core.backend.repository.ShowSeatRepository;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class BookingService {
 
     private final ShowSeatRepository showSeatRepository;
     private final BookingRepository bookingRepository;
+    private final SeatAvailabilityCache seatAvailabilityCache;
 
     public BookingService(
             ShowSeatRepository showSeatRepository,
-            BookingRepository bookingRepository) {
+            BookingRepository bookingRepository,
+            SeatAvailabilityCache seatAvailabilityCache) {
+
         this.showSeatRepository = showSeatRepository;
         this.bookingRepository = bookingRepository;
+        this.seatAvailabilityCache = seatAvailabilityCache;
     }
 
     @Transactional
@@ -28,43 +37,60 @@ public class BookingService {
         ShowSeat seat = showSeatRepository
                 .findByIdForUpdate(showSeatId)
                 .orElseThrow(() ->
-                        new IllegalArgumentException(
-                                "Seat not found"));
+                        new IllegalArgumentException("Seat not found"));
 
         if (seat.getStatus() != SeatStatus.AVAILABLE) {
-            throw new IllegalStateException(
-                    "Seat is already booked");
+            throw new IllegalStateException("Seat is already booked");
         }
 
         seat.setStatus(SeatStatus.BOOKED);
 
-        return bookingRepository.save(
-                new Booking(userId, showSeatId));
+        Booking booking = bookingRepository.save(
+                new Booking(userId, showSeatId)
+        );
+
+        invalidateCacheAfterCommit(seat.getShowId());
+
+        return booking;
     }
 
     @Transactional
-public Booking cancelBooking(Long bookingId) {
+    public Booking cancelBooking(Long bookingId) {
 
-    Booking booking = bookingRepository.findById(bookingId)
-            .orElseThrow(() ->
-                    new IllegalArgumentException(
-                            "Booking not found"));
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() ->
+                        new IllegalArgumentException("Booking not found"));
 
-    if (booking.getStatus() == BookingStatus.CANCELLED) {
-        throw new IllegalStateException(
-                "Booking is already cancelled");
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            throw new IllegalStateException(
+                    "Booking is already cancelled");
+        }
+
+        ShowSeat seat = showSeatRepository
+                .findByIdForUpdate(booking.getShowSeatId())
+                .orElseThrow(() ->
+                        new IllegalArgumentException("Seat not found"));
+
+        booking.setStatus(BookingStatus.CANCELLED);
+        seat.setStatus(SeatStatus.AVAILABLE);
+
+        Booking updatedBooking = bookingRepository.save(booking);
+
+        invalidateCacheAfterCommit(seat.getShowId());
+
+        return updatedBooking;
     }
 
-    ShowSeat seat = showSeatRepository
-            .findByIdForUpdate(booking.getShowSeatId())
-            .orElseThrow(() ->
-                    new IllegalArgumentException(
-                            "Seat not found"));
+    private void invalidateCacheAfterCommit(Long showId) {
 
-    booking.setStatus(BookingStatus.CANCELLED);
-    seat.setStatus(SeatStatus.AVAILABLE);
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
 
-    return bookingRepository.save(booking);
+                    @Override
+                    public void afterCommit() {
+                        seatAvailabilityCache.invalidate(showId);
+                    }
+                }
+        );
+    }
 }
-}
-
