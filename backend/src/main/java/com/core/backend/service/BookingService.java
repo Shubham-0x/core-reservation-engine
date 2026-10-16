@@ -55,11 +55,11 @@ public class BookingService {
     }
 
     @Transactional
-    public Booking cancelBooking(Long bookingId) {
+    public Booking cancelBooking(Long bookingId, Long userId) {
 
-        Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() ->
-                        new IllegalArgumentException("Booking not found"));
+        Booking booking = bookingRepository.findByIdAndUserId(bookingId, userId)
+    .orElseThrow(() -> new IllegalArgumentException(
+        "Booking not found or you are not authorized to cancel it"));
 
         if (booking.getStatus() == BookingStatus.CANCELLED) {
             throw new IllegalStateException(
