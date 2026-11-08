@@ -34,13 +34,22 @@ public class ShowSeatService {
             return cachedSeats;
         }
 
+        // Record the cache generation before reading the database.
+        long generation = seatAvailabilityCache.getGeneration();
+
         List<ShowSeatDto> seats = showSeatRepository
                 .findByShowId(showId)
                 .stream()
                 .map(this::toDto)
                 .toList();
 
-        seatAvailabilityCache.put(showId, seats);
+        // Do not cache the result if an invalidation happened
+        // while the database query was running.
+        seatAvailabilityCache.putIfGenerationMatches(
+                showId,
+                generation,
+                seats
+        );
 
         return seats;
     }

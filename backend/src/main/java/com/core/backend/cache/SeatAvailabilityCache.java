@@ -1,4 +1,3 @@
-
 package com.core.backend.cache;
 
 import com.core.backend.dto.ShowSeatDto;
@@ -25,6 +24,9 @@ public class SeatAvailabilityCache {
     private long hits;
     private long misses;
 
+    // Changes whenever a booking or cancellation invalidates the cache.
+    private long generation;
+
     public synchronized List<ShowSeatDto> get(Long showId) {
         List<ShowSeatDto> seats = cache.get(showId);
 
@@ -37,12 +39,25 @@ public class SeatAvailabilityCache {
         return seats;
     }
 
-    public synchronized void put(
-            Long showId, List<ShowSeatDto> seats) {
+    public synchronized long getGeneration() {
+        return generation;
+    }
+
+    public synchronized boolean putIfGenerationMatches(
+            Long showId,
+            long expectedGeneration,
+            List<ShowSeatDto> seats) {
+
+        if (generation != expectedGeneration) {
+            return false;
+        }
+
         cache.put(showId, List.copyOf(seats));
+        return true;
     }
 
     public synchronized void invalidate(Long showId) {
+        generation++;
         cache.remove(showId);
     }
 
