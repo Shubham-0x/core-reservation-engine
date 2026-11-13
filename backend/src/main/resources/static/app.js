@@ -1,10 +1,9 @@
-
 const API = "/api";
 
 const $ = (id) => document.getElementById(id);
 
 const eventSelect = $("eventSelect");
-const showIdInput = $("showId");
+const showSelect = $("showSelect");
 const loadSeatsButton = $("loadSeats");
 const seatArea = $("seatArea");
 const seatGrid = $("seatGrid");
@@ -14,6 +13,12 @@ const eventInfo = $("eventInfo");
 const bookingIdInput = $("bookingId");
 const cancelButton = $("cancelButton");
 const toast = $("toast");
+const loginForm = $("loginForm");
+const registerForm = $("registerForm");
+const userStatus = $("userStatus");
+const logoutButton = $("logoutButton");
+const historyList = $("historyList");
+const refreshHistoryButton = $("refreshHistory");
 
 let currentSeats = [];
 let selectedSeatId = null;
@@ -73,61 +78,105 @@ async function apiRequest(url, options = {}) {
 }
 
 // Credentials are kept only in memory, not in localStorage.
-async function ensureAuthenticated() {
+function setSignedIn(email, basicToken) {
+    authHeader = `Basic ${basicToken}`;
+    authenticatedEmail = email;
+    userStatus.textContent = `Signed in as ${email}`;
+    logoutButton.hidden = false;
+}
+
+function clearAuth() {
+    authHeader = null;
+    authenticatedEmail = null;
+    userStatus.textContent = "Not signed in";
+    logoutButton.hidden = true;
+    historyList.innerHTML =
+        '<p class="field-hint">Sign in to see your bookings here.</p>';
+}
+
+function ensureAuthenticated() {
     if (authHeader && authenticatedEmail) {
         return true;
     }
 
-    const email = prompt("Enter your registered email:");
+    showToast("Sign in first, using the account form above.", true);
+    $("authSection").scrollIntoView({ behavior: "smooth" });
+    $("loginEmail").focus({ preventScroll: true });
+    return false;
+}
 
-    if (!email || !email.trim()) {
-        showToast("Login required to continue.", true);
-        return false;
-    }
+async function signIn(email, password) {
+    const basicToken = btoa(`${email}:${password}`);
 
-    const password = prompt("Enter your password:");
+    const response = await fetch(`${API}/auth/login`, {
+        method: "POST",
+        headers: { Authorization: `Basic ${basicToken}` }
+    });
 
-    if (password === null || password.length === 0) {
-        showToast("Password is required.", true);
-        return false;
-    }
-
-    const basicToken = btoa(`${email.trim()}:${password}`);
-    const temporaryHeader = `Basic ${basicToken}`;
+    const text = await response.text();
+    let data = {};
 
     try {
-        const response = await fetch(`${API}/auth/login`, {
+        data = text ? JSON.parse(text) : {};
+    } catch {
+        data = { message: text };
+    }
+
+    if (!response.ok) {
+        throw new Error(
+            data.message || data.error || "Login failed. Check your credentials."
+        );
+    }
+
+    setSignedIn(email, basicToken);
+    showToast(`Signed in as ${email}`);
+    await loadHistory();
+}
+
+async function handleLogin(event) {
+    event.preventDefault();
+
+    const email = $("loginEmail").value.trim();
+    const password = $("loginPassword").value;
+
+    if (!email || !password) {
+        showToast("Enter your email and password.", true);
+        return;
+    }
+
+    try {
+        await signIn(email, password);
+    } catch (error) {
+        showToast(`Login failed: ${error.message}`, true);
+    }
+}
+
+async function handleRegister(event) {
+    event.preventDefault();
+
+    const name = $("registerName").value.trim();
+    const email = $("registerEmail").value.trim();
+    const password = $("registerPassword").value;
+
+    if (!name || !email || password.length < 8) {
+        showToast("Enter a name, an email, and a password of at least 8 characters.", true);
+        return;
+    }
+
+    try {
+        await apiRequest(`${API}/auth/register`, {
             method: "POST",
-            headers: {
-                Authorization: temporaryHeader
-            }
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, email, password })
         });
 
-        const text = await response.text();
-        let data = {};
-
-        try {
-            data = text ? JSON.parse(text) : {};
-        } catch {
-            data = { message: text };
-        }
-
-        if (!response.ok) {
-            throw new Error(
-                data.message || data.error || "Login failed. Check your credentials."
-            );
-        }
-
-        authHeader = temporaryHeader;
-        authenticatedEmail = email.trim();
-
-        showToast(`Signed in as ${authenticatedEmail}`);
-        return true;
+        showToast("Account created. Now sign in with your new details.");
+        $("loginEmail").value = email;
+        $("loginPassword").value = "";
+        $("loginPassword").focus();
+        registerForm.reset();
     } catch (error) {
-        authHeader = null;
-        authenticatedEmail = null;
-        showToast(`Login failed: ${error.message}`, true);
-        return false;
+        showToast(`Registration failed: ${error.message}`, true);
     }
 }
 
@@ -170,6 +219,45 @@ async function loadEvents() {
     }
 }
 
+async function loadShows(eventId) {
+    showSelect.innerHTML = '<option value="">Loading shows…</option>';
+    seatArea.hidden = true;
+    resetSelection();
+
+    if (!eventId) {
+        showSelect.innerHTML =
+            '<option value="">Select an event first</option>';
+        return;
+    }
+
+    try {
+        const shows = await apiRequest(
+            `${API}/events/${encodeURIComponent(eventId)}/shows`
+        );
+
+        showSelect.innerHTML = '<option value="">Select a show</option>';
+
+        if (!Array.isArray(shows) || shows.length === 0) {
+            showSelect.innerHTML =
+                '<option value="">No shows for this event</option>';
+            return;
+        }
+
+        shows.forEach((show) => {
+            const option = document.createElement("option");
+            option.value = show.id;
+            option.textContent = show.showTime
+                ? new Date(show.showTime).toLocaleString()
+                : `Show ${show.id}`;
+            showSelect.appendChild(option);
+        });
+    } catch (error) {
+        showSelect.innerHTML =
+            '<option value="">Could not load shows</option>';
+        showToast(`Could not load shows: ${error.message}`, true);
+    }
+}
+
 function updateEventInfo() {
     const option = eventSelect.selectedOptions[0];
 
@@ -198,17 +286,17 @@ function renderSeats() {
     currentSeats.forEach((seat) => {
         const button = document.createElement("button");
         const isAvailable = seat.status === "AVAILABLE";
+        const label = seat.seatNumber || `S${seat.seatId ?? seat.id}`;
 
         button.type = "button";
         button.className =
             `seat ${isAvailable ? "available" : "booked"}`;
 
-        button.textContent =
-            seat.seatNumber || `S${seat.seatId ?? seat.id}`;
+        button.textContent = label;
 
         button.title = isAvailable
-            ? `Select seat ${button.textContent}`
-            : `Seat ${button.textContent} is booked`;
+            ? `Select seat ${label}`
+            : `Seat ${label} is booked`;
 
         button.setAttribute("aria-label", button.title);
         button.disabled = !isAvailable;
@@ -223,7 +311,7 @@ function renderSeats() {
             button.classList.add("selected");
             bookButton.disabled = false;
             selectionText.textContent =
-                `Seat ${button.textContent} selected`;
+                `Seat ${label} selected`;
         });
 
         seatGrid.appendChild(button);
@@ -231,12 +319,11 @@ function renderSeats() {
 }
 
 async function loadSeats() {
-    const showId = showIdInput.value.trim();
+    const showId = showSelect.value;
 
-    if (!showId || !Number.isInteger(Number(showId)) ||
-        Number(showId) < 1) {
-        showToast("Enter a valid show ID.", true);
-        showIdInput.focus();
+    if (!showId) {
+        showToast("Choose an event and a show first.", true);
+        showSelect.focus();
         return;
     }
 
@@ -277,12 +364,14 @@ async function bookSelectedSeat() {
         return;
     }
 
-    if (!(await ensureAuthenticated())) {
+    if (!ensureAuthenticated()) {
         return;
     }
 
     bookButton.disabled = true;
     bookButton.textContent = "Reserving…";
+
+    let confirmationMessage = null;
 
     try {
         const result = await apiRequest(`${API}/bookings`, {
@@ -299,29 +388,71 @@ async function bookSelectedSeat() {
 
         if (bookingId != null) {
             bookingIdInput.value = bookingId;
-            showToast(
-                `Booking confirmed. Booking ID: ${bookingId}`
-            );
+            confirmationMessage =
+                `Booking confirmed. Booking ID: ${bookingId}`;
         } else {
-            showToast(
-                result.message || "Booking completed."
-            );
+            confirmationMessage =
+                result.message || "Booking completed.";
         }
 
+        showToast(confirmationMessage);
+
         await loadSeats();
+        await loadHistory();
+
+        // loadSeats shows its own toast, so repeat the
+        // confirmation after the seat list has reloaded.
+        showToast(confirmationMessage);
     } catch (error) {
-        showToast(`Booking failed: ${error.message}`, true);
+        const failureMessage = `Booking failed: ${error.message}`;
 
         if (error.status === 401) {
-            authHeader = null;
-            authenticatedEmail = null;
+            clearAuth();
         }
 
         await loadSeats();
+
+        // loadSeats shows its own toast, so repeat the
+        // failure message after the seat list has reloaded.
+        showToast(failureMessage, true);
     } finally {
         bookButton.innerHTML =
             'Confirm booking <span aria-hidden="true">↗</span>';
         bookButton.disabled = true;
+    }
+}
+
+async function cancelBookingById(bookingId) {
+    if (!ensureAuthenticated()) {
+        return;
+    }
+
+    try {
+        const result = await apiRequest(
+            `${API}/bookings/${encodeURIComponent(bookingId)}/cancel`,
+            { method: "PUT" }
+        );
+
+        const confirmationMessage =
+            `Booking ${result.id ?? bookingId} cancelled successfully.`;
+
+        showToast(confirmationMessage);
+
+        if (!seatArea.hidden && showSelect.value) {
+            await loadSeats();
+        }
+
+        await loadHistory();
+
+        // loadSeats shows its own toast, so repeat the
+        // confirmation after the seat list has reloaded.
+        showToast(confirmationMessage);
+    } catch (error) {
+        showToast(`Cancellation failed: ${error.message}`, true);
+
+        if (error.status === 401) {
+            clearAuth();
+        }
     }
 }
 
@@ -335,36 +466,66 @@ async function cancelBooking() {
         return;
     }
 
-    if (!(await ensureAuthenticated())) {
-        return;
-    }
-
     cancelButton.disabled = true;
     cancelButton.textContent = "Cancelling…";
 
     try {
-        const result = await apiRequest(
-            `${API}/bookings/${encodeURIComponent(bookingId)}/cancel`,
-            { method: "PUT" }
-        );
-
-        showToast(
-            `Booking ${result.id ?? bookingId} cancelled successfully.`
-        );
-
-        if (!seatArea.hidden && showIdInput.value.trim()) {
-            await loadSeats();
-        }
-    } catch (error) {
-        showToast(`Cancellation failed: ${error.message}`, true);
-
-        if (error.status === 401) {
-            authHeader = null;
-            authenticatedEmail = null;
-        }
+        await cancelBookingById(bookingId);
     } finally {
         cancelButton.disabled = false;
         cancelButton.textContent = "Cancel booking";
+    }
+}
+
+async function loadHistory() {
+    if (!authHeader) {
+        historyList.innerHTML =
+            '<p class="field-hint">Sign in to see your bookings here.</p>';
+        return;
+    }
+
+    try {
+        const bookings = await apiRequest(`${API}/bookings/my`);
+
+        if (!Array.isArray(bookings) || bookings.length === 0) {
+            historyList.innerHTML =
+                '<p class="field-hint">No bookings yet. Choose a seat above to make your first booking.</p>';
+            return;
+        }
+
+        historyList.replaceChildren();
+
+        bookings.forEach((booking) => {
+            const item = document.createElement("div");
+            item.className = "history-item";
+
+            const text = document.createElement("div");
+            text.innerHTML =
+                `<strong>Booking #${escapeHtml(booking.id)}</strong>` +
+                ` · Show seat #${escapeHtml(booking.showSeatId)}` +
+                ` · ${escapeHtml(booking.status)}` +
+                (booking.bookedAt
+                    ? ` · ${escapeHtml(new Date(booking.bookedAt).toLocaleString())}`
+                    : "");
+            item.appendChild(text);
+
+            if (booking.status === "CONFIRMED") {
+                const cancel = document.createElement("button");
+                cancel.type = "button";
+                cancel.className = "button button-secondary";
+                cancel.textContent = "Cancel";
+                cancel.addEventListener("click", () => {
+                    bookingIdInput.value = booking.id;
+                    cancelBookingById(booking.id);
+                });
+                item.appendChild(cancel);
+            }
+
+            historyList.appendChild(item);
+        });
+    } catch (error) {
+        historyList.innerHTML =
+            `<p class="field-hint">Could not load your bookings: ${escapeHtml(error.message)}</p>`;
     }
 }
 
@@ -415,6 +576,10 @@ function setupNavigation() {
                 $("reserveSection").scrollIntoView({
                     behavior: "smooth"
                 });
+            } else if (target === "history") {
+                $("historySection").scrollIntoView({
+                    behavior: "smooth"
+                });
             } else if (target === "manage") {
                 $("manageSection").scrollIntoView({
                     behavior: "smooth"
@@ -425,10 +590,20 @@ function setupNavigation() {
     });
 }
 
-eventSelect.addEventListener("change", updateEventInfo);
+eventSelect.addEventListener("change", () => {
+    updateEventInfo();
+    loadShows(eventSelect.value);
+});
 loadSeatsButton.addEventListener("click", loadSeats);
 bookButton.addEventListener("click", bookSelectedSeat);
 cancelButton.addEventListener("click", cancelBooking);
+loginForm.addEventListener("submit", handleLogin);
+registerForm.addEventListener("submit", handleRegister);
+logoutButton.addEventListener("click", () => {
+    clearAuth();
+    showToast("Signed out.");
+});
+refreshHistoryButton.addEventListener("click", loadHistory);
 
 $("themeToggle").addEventListener("click", () => {
     const nextTheme = document.body.classList.contains("light")
@@ -438,7 +613,7 @@ $("themeToggle").addEventListener("click", () => {
     setTheme(nextTheme);
 });
 
-showIdInput.addEventListener("keydown", (event) => {
+showSelect.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
         loadSeats();
     }

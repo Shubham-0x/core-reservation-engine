@@ -503,6 +503,52 @@ h2, h3 {
     margin-top: 17px;
 }
 
+#authSection {
+    margin-bottom: 17px;
+}
+
+.register-form {
+    margin-top: 22px;
+    padding-top: 22px;
+    border-top: 1px solid var(--border);
+}
+
+.user-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.user-status .button {
+    min-height: 32px;
+    padding: 0 11px;
+    gap: 6px;
+}
+
+.history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.history-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--bg);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.history-item .button {
+    min-height: 34px;
+    flex-shrink: 0;
+}
+
 .manage-row {
     display: flex;
     align-items: end;
@@ -670,6 +716,15 @@ h2, h3 {
     .manage-row {
         align-items: stretch;
         flex-direction: column;
+    }
+
+    .history-item {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .history-item .button {
+        width: 100%;
     }
 
     .selection-bar .button,

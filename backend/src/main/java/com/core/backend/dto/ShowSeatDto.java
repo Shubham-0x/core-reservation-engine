@@ -7,5 +7,6 @@ public record ShowSeatDto(
         Long id,
         Long showId,
         Long seatId,
-        SeatStatus status
+        SeatStatus status,
+        String seatNumber
 ) {}

@@ -10,7 +10,33 @@ The system uses a bounded FIFO request queue, multiple worker threads, database 
 
 It also includes a seat availability cache with LRU eviction and generation-based invalidation to prevent stale database results from repopulating the cache after booking operations.
 
-## 2. Technology Stack
+## 2. Phase 3 — What Was Added
+
+Phase 3 completes the reservation journey and the reliability
+evidence, on branch `feature/phase3-completion`:
+
+- A real login and registration interface in the frontend, replacing
+  the old browser-prompt login. Credentials are kept in memory only.
+- Show selection: `GET /api/events/{eventId}/shows` lists the shows
+  for an event, so the user picks a show from a list instead of
+  typing a show ID.
+- Booking history: `GET /api/bookings/my` returns the signed-in
+  user's bookings, newest first, with a cancel button per booking.
+  Seat numbers are now shown in the seat grid.
+- Database schema and demo seed data, in
+  `backend/src/main/resources/db/schema.sql` and `seed.sql`.
+  The schema is derived from the JPA entities and the integration
+  tests. Duplicate active bookings are prevented by the pessimistic
+  row lock inside a transaction, not by a unique index — see
+  `docs/ARCHITECTURE.md` and the comment in `schema.sql`.
+- New tests: engine shutdown, 100-request stress, queue
+  saturation, transaction rollback, cache consistency after
+  booking and cancellation, and API tests for authentication,
+  validation and booking history.
+- Documentation: `docs/ARCHITECTURE.md`, `docs/TEST_EVIDENCE.md`,
+  `docs/DEMO.md`, `docs/VIVA.md`.
+
+## 3. Technology Stack
 
 | Technology                | Purpose |
 
@@ -168,7 +194,14 @@ The application uses `ddl-auto=validate`.
 
 This validates the database schema rather than automatically creating or modifying it.
 
-**Important:** A database creation or migration SQL script is not currently included in this repository. The database must be prepared separately before running the application and integration tests.
+**Important:** The database schema is included in this repository
+at `backend/src/main/resources/db/schema.sql`. Run it once on a
+fresh MySQL install, then load demo data with `seed.sql`:
+
+```powershell
+mysql -u root -p < backend\src\main\resources\db\schema.sql
+mysql -u root -p core_db < backend\src\main\resources\db\seed.sql
+```
 
 The database includes the following main entities:
 
@@ -179,7 +212,12 @@ The database includes the following main entities:
 - `show_seats`
 - `bookings`
 
-The bookings table uses a database-level unique constraint on active show-seat bookings to provide an additional safeguard against duplicate reservations.
+Duplicate active bookings are prevented by the pessimistic write
+lock on the `show_seats` row inside a database transaction
+(`BookingService.bookSeat`). There is no unique index on
+`bookings`: a unique index on `show_seat_id` alone would forbid
+rebooking a seat after a cancellation, because the cancelled
+booking row stays recorded. See `docs/ARCHITECTURE.md`.
 
 ## 7. Running the Backend
 
@@ -228,9 +266,11 @@ The backend exposes the following REST endpoints:
 | POST | `/api/auth/register` | Register a user | Public |
 | POST | `/api/auth/login` | Authenticate a user | Public |
 | GET | `/api/events` | Retrieve events | Public |
+| GET | `/api/events/{eventId}/shows` | Retrieve shows for an event | Public |
 | GET | `/api/shows/{showId}/seats` | Retrieve seats for a show | Public |
 | GET | `/api/shows/cache/stats` | Retrieve seat cache statistics | Public |
 | POST | `/api/bookings` | Book a show seat | Required |
+| GET | `/api/bookings/my` | Retrieve my bookings, newest first | Required |
 | PUT | `/api/bookings/{bookingId}/cancel` | Cancel an existing booking | Required |
 
 ### User Registration
@@ -336,7 +376,7 @@ The database integration tests require a working MySQL connection and a correctl
 
 ## 10. Current Test Evidence
 
-The latest verified test result:
+The latest verified Phase 2 test result:
 
 ```text
 Tests run: 9
@@ -346,6 +386,11 @@ Skipped: 0
 
 BUILD SUCCESS
 ```
+
+Phase 3 test evidence, including the new unit-test result
+(11 tests, 0 failures) and the status of the database and API
+tests, is in `docs/TEST_EVIDENCE.md`. That file records only
+results from actual runs.
 
 ### Concurrent Booking Verification
 
@@ -397,19 +442,21 @@ The current implementation covers:
 
 The current implementation does not claim completion of write-ahead logging (WAL), checkpointing, crash recovery, or disk-based scheduling.
 
-A database creation or migration SQL script is also not currently included.
-
 ## 12. Git Branch and Development Status
 
-The Phase 2 implementation is maintained on the following development branch:
+Phase 2 is maintained on `feature/phase2-completion` and is
+unchanged by Phase 3. Phase 3 work is on:
 
 ```text
-feature/phase2-completion
+feature/phase3-completion
 ```
 
-The branch contains the booking engine, concurrency protection, integration tests, documentation, and cache improvements.
+The Phase 3 branch contains the completed frontend reservation
+journey, the show and booking-history APIs, the database schema
+and seed data, the additional reliability tests, and the final
+documentation.
 
-The development branch is maintained separately from `main`.
+The development branches are maintained separately from `main`.
 
 ## 13. Future Scope
 

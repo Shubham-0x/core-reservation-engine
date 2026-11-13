@@ -3,16 +3,22 @@ package com.core.backend.controller;
 
 import com.core.backend.entity.Booking;
 import com.core.backend.entity.User;
+import com.core.backend.repository.BookingRepository;
 import com.core.backend.repository.UserRepository;
 import com.core.backend.service.BookingService;
 import core.reservation.engine.BookingEngine;
 import core.reservation.engine.BookingResult;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -24,22 +30,35 @@ public class BookingController {
 
     private final BookingEngine bookingEngine;
     private final UserRepository userRepository;
+    private final BookingRepository bookingRepository;
     private final BookingService bookingService;
 
     public BookingController(
             BookingEngine bookingEngine,
             UserRepository userRepository,
+            BookingRepository bookingRepository,
             BookingService bookingService) {
         this.bookingEngine = bookingEngine;
         this.userRepository = userRepository;
+        this.bookingRepository = bookingRepository;
         this.bookingService = bookingService;
     }
 
-    public record BookingRequest(Long showSeatId) {}
+    public record BookingRequest(
+            @NotNull @Positive Long showSeatId) {}
+
+    @GetMapping("/my")
+    public List<Booking> getMyBookings(Authentication authentication) {
+        User user = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new IllegalStateException(
+                        "Authenticated user not found"));
+
+        return bookingRepository.findByUserIdOrderByIdDesc(user.getId());
+    }
 
     @PostMapping
     public ResponseEntity<?> bookSeat(
-            @RequestBody BookingRequest request,
+            @Valid @RequestBody BookingRequest request,
             Authentication authentication) {
 
         if (request.showSeatId() == null

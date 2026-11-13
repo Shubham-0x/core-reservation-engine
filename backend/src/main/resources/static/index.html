@@ -21,6 +21,10 @@
                 <span class="nav-icon">▤</span>
                 <span>Events</span>
             </button>
+            <button class="nav-item" data-section="history">
+                <span class="nav-icon">≡</span>
+                <span>History</span>
+            </button>
             <button class="nav-item" data-section="manage">
                 <span class="nav-icon">↗</span>
                 <span>Manage</span>
@@ -39,7 +43,10 @@
     <main class="main">
         <header class="topbar">
             <div class="breadcrumb"><span>CORE</span><span class="slash">/</span> Reservation engine</div>
-            <div class="status"><span class="status-dot"></span> System online</div>
+            <div class="user-status">
+                <span id="userStatus" class="status">Not signed in</span>
+                <button id="logoutButton" class="button button-secondary" hidden>Sign out</button>
+            </div>
         </header>
 
         <section class="workspace">
@@ -51,6 +58,50 @@
                     Leave the reservation logic to CORE.
                 </p>
             </div>
+
+            <section class="panel" id="authSection">
+                <div class="panel-heading">
+                    <div>
+                        <div class="section-kicker">00 / ACCOUNT</div>
+                        <h2>Sign in or create an account</h2>
+                    </div>
+                    <span class="step-mark">REQUIRED TO BOOK</span>
+                </div>
+
+                <form id="loginForm" class="field-grid" autocomplete="on">
+                    <label class="field">
+                        <span>EMAIL</span>
+                        <input id="loginEmail" type="email" placeholder="you@example.com" required>
+                    </label>
+                    <label class="field">
+                        <span>PASSWORD</span>
+                        <input id="loginPassword" type="password" placeholder="Your password" required>
+                    </label>
+                    <div class="action-row">
+                        <p class="field-hint">Already registered? Sign in to book and see your history.</p>
+                        <button type="submit" class="button button-primary">Sign in <span aria-hidden="true">↗</span></button>
+                    </div>
+                </form>
+
+                <form id="registerForm" class="field-grid register-form" autocomplete="on">
+                    <label class="field">
+                        <span>NAME</span>
+                        <input id="registerName" type="text" placeholder="Your name" required maxlength="100">
+                    </label>
+                    <label class="field">
+                        <span>EMAIL</span>
+                        <input id="registerEmail" type="email" placeholder="you@example.com" required>
+                    </label>
+                    <label class="field">
+                        <span>PASSWORD (8+ CHARACTERS)</span>
+                        <input id="registerPassword" type="password" placeholder="At least 8 characters" required minlength="8" maxlength="72">
+                    </label>
+                    <div class="action-row">
+                        <p class="field-hint">New here? Create an account, then sign in above.</p>
+                        <button type="submit" class="button button-secondary">Create account</button>
+                    </div>
+                </form>
+            </section>
 
             <section class="panel" id="reserveSection">
                 <div class="panel-heading">
@@ -70,13 +121,15 @@
                     </label>
 
                     <label class="field">
-                        <span>SHOW ID</span>
-                        <input id="showId" type="number" min="1" placeholder="Enter show ID" inputmode="numeric">
+                        <span>SHOW</span>
+                        <select id="showSelect">
+                            <option value="">Select an event first</option>
+                        </select>
                     </label>
                 </div>
 
                 <div class="action-row">
-                    <p class="field-hint">Choose an event and enter its show ID.</p>
+                    <p class="field-hint">Choose an event, then choose one of its shows.</p>
                     <button id="loadSeats" class="button button-primary">
                         Find seats <span aria-hidden="true">↗</span>
                     </button>
@@ -128,6 +181,19 @@
                     <button id="cancelButton" class="button button-secondary">Cancel booking</button>
                 </div>
                 <p class="field-hint">Cancellation releases the seat for another reservation.</p>
+            </section>
+
+            <section class="panel manage-panel" id="historySection">
+                <div class="panel-heading">
+                    <div>
+                        <div class="section-kicker">04 / HISTORY</div>
+                        <h2>Your bookings</h2>
+                    </div>
+                    <button id="refreshHistory" class="button button-secondary">Refresh</button>
+                </div>
+                <div id="historyList" class="history-list">
+                    <p class="field-hint">Sign in to see your bookings here.</p>
+                </div>
             </section>
 
             <div id="toast" class="toast" role="status" aria-live="polite"></div>
