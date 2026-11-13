@@ -125,20 +125,28 @@ message is now shown again after the reload.
 The full browser journey against the real backend still needs
 the permission in section 3. See `docs/DEMO.md` for the steps.
 
-## 6. GitHub push — branch creation blocked by the app's permissions
+## 6. GitHub push — completed 2026-11-13 ~21:30 IST
 
-On 2026-11-13 at ~21:15 IST the GitHub connector showed
-`connected` as Shubham-0x and `list_branches` confirmed the
-remote: `feature/phase2-completion` = `fd358924...`,
-`main` = `7b3b770c...`, and no `feature/phase3-completion`
-yet. Both `create_branch` (from `feature/phase2-completion`)
-and `push_files` failed with
-`403 Resource not accessible by integration` on
-`POST /repos/Shubham-0x/core-reservation-engine/git/refs` —
-the connected GitHub App cannot create branch references.
-The branch must be created on GitHub first (web UI, from
-`feature/phase2-completion`), then the snapshot push can be
-retried. All Phase 3 work is committed locally on
-`feature/phase3-completion` (HEAD `de323c8`) and is ready to
-push; nothing has been pushed to `main` or
-`feature/phase2-completion`.
+- The GitHub connector was connected as Shubham-0x and the
+  Muse GitHub App was installed on the repository. The first
+  `create_branch` / `push_files` attempts failed with
+  `403 Resource not accessible by integration` on `git/refs`;
+  after the App installation the branch creation succeeded.
+- Branch `feature/phase3-completion` was created from the
+  exact Phase 2 commit `fd358924a5a3112731ee7f97cef84b02d371c714`.
+- Snapshot push confirmed: remote HEAD
+  **`fc029166e6437bfbb8dda23dcdcf3515ba66a49c`**
+  ("Complete CORE Phase 3: frontend journey, show and booking
+  history APIs, schema, reliability tests and docs"), parent
+  `fd358924...`, verified with `list_commits`.
+- Content verified: the remote blob SHAs of
+  `backend/src/main/resources/db/schema.sql`,
+  `docs/TEST_EVIDENCE.md` and
+  `backend/src/main/resources/static/app.js` match the local
+  files exactly.
+- Note: the remote snapshot is one commit holding all Phase 3
+  changes on top of the Phase 2 commit. The local branch
+  keeps the same content in four commits (`dba2c41`,
+  `62ec3ec`, `de323c8`, `8fd923c`); the trees are identical,
+  the commit SHAs differ by design of the snapshot push.
+  Nothing was pushed to `main` or `feature/phase2-completion`.
