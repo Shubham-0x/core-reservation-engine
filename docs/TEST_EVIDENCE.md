@@ -256,33 +256,32 @@ credentials, and the full suite (section 3) and the E2E run
   after committing; push to `feature/phase3-completion` only —
   see section 8.
 
-## 8. Final push — BLOCKED on approval, not yet pushed (2026-11-14)
+## 8. Final push — DONE 2026-11-14, remote HEAD verified
 
-- Local commit `b0ab1b3` ("Complete CORE Phase 3: configurable
+- Local commits `b0ab1b3` ("Complete CORE Phase 3: configurable
   datasource, MariaDB Unix-socket support, /api/health fix, final
-  docs and evidence") holds all of the above. Working tree clean.
-- The push to `feature/phase3-completion` has **not** been
-  performed. Direct `git push` fails in this VM with
+  docs and evidence") and `781ebce` (blocked-push record) hold
+  all of the above. Working tree clean.
+- Direct `git push` fails in this VM with
   `fatal: could not read Username for 'https://github.com': No
   such device or address` (no credentials available to git), so
-  the push must go through the GitHub connector's `push_files`
+  the push went through the GitHub connector's `push_files`
   snapshot route, as on 2026-11-13.
-- Two `push_files` attempts were made on 2026-11-14 (same
-  70-file snapshot, manifest `/tmp/core-snapshot-paths.txt`).
-  Both ended with `approval_expired`: the connector's write
-  approval card timed out after 30 minutes with no decision,
-  and the action was not performed. Approval IDs:
-  `connector-attempt-d7307a039f40165a955cbed8028c66e36e06326f56c0f10cea601a3234d18c76`
-  and
-  `connector-attempt-580ae52b5072e1405984ccb586014a8c2a611a20c90cba383e10134bd9f3be29`.
-- Remote HEAD is still
-  `3f9fb033103f7cf7cc9f1e4f15c170552dd38692` (verified by
-  `git ls-remote` after both attempts). Nothing was pushed to
+- Two `push_files` attempts on 2026-11-14 ended with
+  `approval_expired`: the connector's write approval card timed
+  out after 30 minutes with no decision. On 2026-11-14 at
+  08:59 IST Shubham said "push it now" and approved the card
+  promptly; the third attempt succeeded
+  (`userConfirmationStatus: approved`).
+- Remote HEAD is now
+  `a93f1558cd09aafc4efbd2abf59d641a292fe120` (verified by
+  `git ls-remote` and by fetching the branch and comparing
+  trees). The connector's snapshot push creates a new remote
+  commit, so the remote SHA differs from the local commit SHA
+  by design (as on 2026-11-13). Verified: every file except the
+  two Maven wrapper scripts is identical between local HEAD
+  (`781ebce`) and the remote commit; the only differences are
+  `backend/mvnw.cmd` line endings (CRLF on the remote, LF
+  locally) and the executable bit on `backend/mvnw` — neither
+  affects the code, tests, or docs. Nothing was pushed to
   `main` or `feature/phase2-completion`.
-- To finish: re-run the `push_files` snapshot from a context
-  where the approval card can be approved, then verify the new
-  remote HEAD and record its SHA here. Note the connector's
-  snapshot push creates a new remote commit, so the remote SHA
-  will differ from the local commit SHA by design (as on
-  2026-11-13); verify instead that the remote tree/blob SHAs
-  match the local files.
