@@ -82,6 +82,7 @@ public class SecurityConfig {
                         "/style.css", "/app.js",
                         "/api/auth/register",
                         "/api/auth/login",
+                        "/api/health",
                         "/error").permitAll()
                 .requestMatchers(HttpMethod.GET,
                         "/api/events",

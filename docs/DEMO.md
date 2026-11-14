@@ -2,6 +2,10 @@
 
 Run the demo in this order. Each step shows the feature it proves.
 
+Every step below was verified end to end in a real browser
+against the running backend on 2026-11-14: 23/23 checks passed
+(see `docs/TEST_EVIDENCE.md`, section 5).
+
 ## Setup (once)
 
 ```powershell
@@ -25,7 +29,9 @@ Start the backend:
 .\mvnw.cmd spring-boot:run
 ```
 
-Open http://localhost:8080 in a browser.
+Open http://localhost:8080 in a browser. Check the backend is up
+first: `GET /api/health` returns `{"status":"UP"}` without signing
+in.
 
 ## The demo
 

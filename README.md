@@ -45,6 +45,7 @@ evidence, on branch `feature/phase3-completion`:
 | Spring Data JPA           | Database persistence |
 | Hibernate                 | ORM |
 | MySQL                     | Relational database |
+| MariaDB Connector/J 4.0.0 | Runtime JDBC driver used only in the Phase 3 test VM to reach local MySQL over its Unix socket (see Section 6); the default remains the MySQL driver over TCP |
 | Maven                     | Build and dependency management |
 | JUnit 5                   | Automated testing |
 | Spring Security           | Authentication and authorization |
@@ -116,7 +117,11 @@ The project uses multiple layers of protection against duplicate active bookings
 - Multiple worker threads process requests concurrently.
 - Pessimistic write locking protects the show-seat database row.
 - Transactional booking operations ensure related database updates are handled together.
-- A database-level unique constraint on active bookings provides an additional safeguard.
+- There is deliberately **no** unique index on `bookings`: a unique
+  index on `show_seat_id` alone would forbid rebooking a seat after
+  a cancellation, because the cancelled booking row stays recorded.
+  Duplicate active bookings are prevented by the pessimistic row
+  lock inside a transaction (`BookingService.bookSeat`).
 
 The concurrency integration test submits 20 concurrent requests for the same available show seat.
 
@@ -180,15 +185,28 @@ These variables apply to the current PowerShell session. Set them again when ope
 The relevant database settings in `application.properties` are:
 
 ```properties
-spring.datasource.url=jdbc:mysql://localhost:3306/core_db
+spring.datasource.url=${DB_URL:jdbc:mysql://localhost:3306/core_db}
 spring.datasource.username=${DB_USERNAME:root}
 spring.datasource.password=${DB_PASSWORD}
-spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+spring.datasource.driver-class-name=${DB_DRIVER:com.mysql.cj.jdbc.Driver}
 
 spring.jpa.hibernate.ddl-auto=validate
 spring.jpa.show-sql=true
 spring.jpa.open-in-view=false
 ```
+
+The defaults are MySQL over TCP on `localhost:3306`, which is what
+a normal Windows setup uses. The URL and driver can be overridden
+with `DB_URL` / `DB_DRIVER` environment variables without changing
+the code. This override is only needed in the Phase 3 test VM,
+where the runtime intercepts Java TCP connections to MySQL: there
+the app and the tests run with the MariaDB driver over MySQL's
+Unix socket
+(`DB_URL=jdbc:mariadb://address=(localSocket=/var/run/mysqld/mysqld.sock)/core_db`,
+`DB_DRIVER=org.mariadb.jdbc.Driver`). The MariaDB Connector/J
+4.0.0 runtime dependency in `pom.xml` exists only to make that
+VM setup work; the Windows default is still the MySQL driver over
+TCP. Full detail is in `docs/TEST_EVIDENCE.md`.
 
 The application uses `ddl-auto=validate`.
 
@@ -265,6 +283,7 @@ The backend exposes the following REST endpoints:
 |---|---|---|---|
 | POST | `/api/auth/register` | Register a user | Public |
 | POST | `/api/auth/login` | Authenticate a user | Public |
+| GET | `/api/health` | Application health (`{"status":"UP"}`) | Public |
 | GET | `/api/events` | Retrieve events | Public |
 | GET | `/api/events/{eventId}/shows` | Retrieve shows for an event | Public |
 | GET | `/api/shows/{showId}/seats` | Retrieve seats for a show | Public |
@@ -376,21 +395,26 @@ The database integration tests require a working MySQL connection and a correctl
 
 ## 10. Current Test Evidence
 
-The latest verified Phase 2 test result:
+The final verified Phase 3 result, run 2026-11-14 against real
+MySQL 8.0.46 (full suite, `clean test`):
 
 ```text
-Tests run: 9
-Failures: 0
-Errors: 0
-Skipped: 0
-
+Tests run: 25, Failures: 0, Errors: 0, Skipped: 0
 BUILD SUCCESS
 ```
 
-Phase 3 test evidence, including the new unit-test result
-(11 tests, 0 failures) and the status of the database and API
-tests, is in `docs/TEST_EVIDENCE.md`. That file records only
-results from actual runs.
+That is 11 unit tests (engine and cache) plus 14 database and API
+tests (concurrency, rollback, cache consistency, auth and
+validation, application context), all passing. The 9 Phase 2 tests
+are a subset of these 25 and pass as part of the same run.
+
+The real browser end-to-end journey against the running backend
+also passed **23/23 checks** on 2026-11-14 (register, login and
+logout, event and show selection, 12 seats, booking A5, duplicate
+rejection with 409, cancel and rebook, history, responsive layout
+at 390px). Full detail, including the per-test table and the
+evidence for every number here, is in `docs/TEST_EVIDENCE.md`.
+That file records only results from actual runs.
 
 ### Concurrent Booking Verification
 

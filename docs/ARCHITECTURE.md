@@ -120,6 +120,10 @@ flowchart TD
 - Protected endpoints use HTTP Basic authentication.
 - `GET /api/events`, `GET /api/events/{id}/shows`,
   `GET /api/shows/{id}/seats` and the static pages are public.
+- `GET /api/health` is public (returns `{"status":"UP"}`), so a
+  health check works without signing in. It was added to the
+  permitAll list in `SecurityConfig` in Phase 3, after it was
+  found returning 401.
 - `POST /api/bookings`, `GET /api/bookings/my` and
   `PUT /api/bookings/{id}/cancel` require a signed-in user.
 - `/api/admin/**` requires the ADMIN role.
@@ -128,9 +132,17 @@ flowchart TD
 
 ## 7. Configuration
 
-- `spring.datasource.url=jdbc:mysql://localhost:3306/core_db`
+- `spring.datasource.url=${DB_URL:jdbc:mysql://localhost:3306/core_db}`
+- `spring.datasource.driver-class-name=${DB_DRIVER:com.mysql.cj.jdbc.Driver}`
 - Credentials come from `DB_USERNAME` and `DB_PASSWORD` environment
   variables. No password is stored in the repository.
+- The defaults are MySQL over TCP on `localhost:3306`. In the
+  Phase 3 test VM only, the URL and driver are overridden with
+  environment variables so the MariaDB driver reaches local MySQL
+  8 over its Unix socket
+  (`jdbc:mariadb://address=(localSocket=/var/run/mysqld/mysqld.sock)/core_db`),
+  because the runtime intercepts Java TCP connections to MySQL in
+  that VM. See `docs/TEST_EVIDENCE.md` for the full explanation.
 - `spring.jpa.hibernate.ddl-auto=validate`
 - Booking engine: 4 workers, queue capacity 200
   (`BookingEngineConfig`).

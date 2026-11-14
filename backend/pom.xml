@@ -55,6 +55,18 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- MariaDB driver: used only in this VM, where Java TCP to
+             MySQL is intercepted by the runtime. The MariaDB driver
+             can reach the local MySQL 8 server over its Unix socket
+             (see docs/TEST_EVIDENCE.md). The Windows default is
+             still the MySQL driver over TCP above. -->
+        <dependency>
+            <groupId>org.mariadb.jdbc</groupId>
+            <artifactId>mariadb-java-client</artifactId>
+            <version>4.0.0</version>
+            <scope>runtime</scope>
+        </dependency>
+
         <!-- Tests -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

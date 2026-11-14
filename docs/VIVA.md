@@ -48,6 +48,29 @@ row is created. The duplicate-booking test checks this: after a
 failed second booking there is still exactly one CONFIRMED booking
 and the seat is BOOKED.
 
+**Q: Why does the project include the MariaDB driver?**
+A: Only for the Phase 3 test VM. In that VM the runtime intercepts
+Java TCP connections to MySQL, so a normal MySQL-over-TCP
+connection from Java fails even though MySQL itself is running
+and reachable from the command-line client and from Python. Java
+can, however, open MySQL's Unix socket, and the MariaDB driver
+can use that socket with no extra native library. So in that VM
+the app runs with `DB_URL` pointing at the socket and
+`DB_DRIVER=org.mariadb.jdbc.Driver`. The default in
+`application.properties` is unchanged — MySQL over TCP on
+`localhost:3306` — so on a normal Windows setup nothing is
+different. The full test suite and the browser end-to-end run
+were executed against real MySQL 8.0.46 this way; no H2 or other
+substitute database was used.
+
+**Q: Why is `/api/health` public?**
+A: A health check has to work without signing in, otherwise a
+monitor or a demo setup cannot tell whether the app is up. It
+returns only `{"status":"UP"}` and no data. It was returning 401
+at first because it was not in the permitAll list in
+`SecurityConfig`; adding it there was a real bug found and fixed
+in Phase 3.
+
 **Q: Is there a unique constraint stopping duplicate bookings?**
 A: No, and that is deliberate. A unique index on `show_seat_id`
 alone would forbid rebooking a seat after a cancellation, because
